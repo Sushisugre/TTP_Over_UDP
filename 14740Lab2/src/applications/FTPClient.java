@@ -34,22 +34,28 @@ public class FTPClient {
         while (!isValid) {
 
             ttpService.send(conn, DataUtil.objectToByte(path));
-            System.out.println("requesting file: " + path);
+            System.out.println("Client: requesting file: " + path);
             FTPMeta meta = (FTPMeta) DataUtil.byteToObject(ttpService.receive(conn));
+            if (!meta.isFound()) {
+                throw new FileNotFoundException(path);
+            }
 
             // loop to receive all the data
             int size = meta.getTotalSize();
+            System.out.println("Client: total file size " + size);
             int offset = 0;
             while(offset < size) {
+                System.out.println("Client: getting file chunk");
                 FTPData data = (FTPData) DataUtil.byteToObject(ttpService.receive(conn));
-                writeContent(path, data.getData(), offset, data.getSize());
+                writeContent(path+"_copy", data.getData(), offset, data.getSize());
                 offset += data.getSize();
             }
 
             // validate MD5Checksum
-            isValid = isMD5Valid(path, meta.getMd5Checksum());
+            isValid = isMD5Valid(path+"_copy", meta.getMd5Checksum());
+            System.out.println("Client: is received file valid? " + isValid);
             if (!isValid) {
-                Files.delete(Paths.get(path));
+                Files.delete(Paths.get(path+"_copy"));
             }
         }
 
@@ -59,9 +65,9 @@ public class FTPClient {
     public static boolean isMD5Valid(String path, String expected) {
         try {
             String checksum = DataUtil.getMD5Checksum(path);
-
-            System.out.println("Received: " + checksum);
-            System.out.println("Expected: " + expected);
+//
+//            System.out.println("Received: " + checksum);
+//            System.out.println("Expected: " + expected);
 
             return checksum.equals(expected);
 

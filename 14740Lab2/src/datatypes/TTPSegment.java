@@ -7,7 +7,13 @@ public class TTPSegment implements Serializable {
     /**
      * Use a large value here to save the trouble of calculate object size
      */
-    public static final int HEADER_SIZE = 50;
+    public static final int HEADER_SIZE = 228;
+
+    /**
+     * max size of datagram is 1500, other datagram header file at least take 172 byte
+     * so limit the TTPSegment size in a reasonable range
+     */
+    public static final int MAX_SEGMENT_SIZE = 1300;
 
     public enum Type {
         SYN,

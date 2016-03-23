@@ -21,6 +21,7 @@ public class DataUtil {
             objOut.writeObject(object);
             return byteOut.toByteArray();
         } catch (IOException e) {
+            e.printStackTrace();
             return byteOut.toByteArray();
         }
     }

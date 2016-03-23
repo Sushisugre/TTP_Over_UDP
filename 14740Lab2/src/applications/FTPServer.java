@@ -32,7 +32,7 @@ public class FTPServer {
 
         int port = Integer.parseInt(args[0]);
         int winSize = Integer.parseInt(args[1]);
-        int timeout = Integer.parseInt(args[1]);
+        int timeout = Integer.parseInt(args[2]);
 
         ttpService = new TTPService(winSize, timeout, port);
 
@@ -41,7 +41,9 @@ public class FTPServer {
                 TTPConnection conn = ttpService.accept();
                 RequestHandler handler = new RequestHandler(conn);
                 threadPool.execute(handler);
-            } catch (Exception e){}
+            } catch (Exception e){
+                e.printStackTrace();
+            }
         }
     }
 
@@ -57,12 +59,14 @@ public class FTPServer {
         public void run() {
 
             try {
-
+                System.out.println("Server: request handler started");
                 String path = (String)DataUtil.byteToObject(ttpService.receive(conn));
+                System.out.println("Server: receive request for - " + path);
 
                 File file = new File(path);
-                BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
+                System.out.println("what the hell");
                 boolean isFound = file.exists();
+                System.out.println("Server: " + path +" found? " + isFound);
 
                 FTPMeta meta = new FTPMeta();
                 meta.setPath(path);
@@ -77,10 +81,12 @@ public class FTPServer {
                 meta.setTotalSize((int)file.length());
                 meta.setMd5Checksum(DataUtil.getMD5Checksum(path));
                 ttpService.send(conn, DataUtil.objectToByte(meta));
+                System.out.println("Server: send file meta");
 
                 int remain = (int)file.length();
                 int retVal = 0;
                 byte[] buffer = new byte[CHUNK_SIZE];
+                BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
 
                 while (retVal != -1) {
 

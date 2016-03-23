@@ -7,8 +7,8 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.LinkedBlockingQueue;
 
 
 public class TTPConnection {
@@ -32,16 +32,17 @@ public class TTPConnection {
     private Timer timer;
     // key: seq number, value: datagram
     private ConcurrentSkipListMap<Integer, Datagram> unacked;
-    private LinkedBlockingQueue<Datagram> dataQueue;
-    private LinkedBlockingQueue<Datagram> controlQueue;
+    private ConcurrentLinkedQueue<Datagram> dataQueue;
+    private ConcurrentLinkedQueue<Datagram> controlQueue;
 
     private DatagramService ds;
 
-    private boolean receivedDATA;
     private boolean receivedSYN;
     private boolean receivedFIN;
     private boolean receivedSYNACK;
     private boolean receivedFINACK;
+
+    private int pendingACK;
 
 
     public TTPConnection(int winSize, int timeout, TTPService ttpService) {
@@ -50,10 +51,14 @@ public class TTPConnection {
         this.ttpService = ttpService;
 
         unacked = new ConcurrentSkipListMap<>();
-        dataQueue = new LinkedBlockingQueue<>();
-        controlQueue = new LinkedBlockingQueue<>();
+        dataQueue = new ConcurrentLinkedQueue<>();
+        controlQueue = new ConcurrentLinkedQueue<>();
         nextSeq = ISN;
         lastAcked = ISN - 1;
+    }
+
+    ConcurrentSkipListMap<Integer, Datagram> getUnacked() {
+        return unacked;
     }
 
     public void initTimer() {
@@ -61,7 +66,7 @@ public class TTPConnection {
     }
 
     public void startTimer() {
-        System.out.println("Start timer");
+        System.out.println("  Start timer");
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -75,6 +80,7 @@ public class TTPConnection {
     }
 
     public void endTimer(){
+        System.out.println("  End timer");
         timer.cancel();
         initTimer();
     }
@@ -104,9 +110,9 @@ public class TTPConnection {
 
     void moveWindowTo(int startSeq) {
         System.out.println("  Move window to "+startSeq);
-        while (unacked.firstKey() < startSeq) {
-            System.out.println("First KEY " + unacked.firstKey());
+        while (!unacked.isEmpty() && unacked.firstKey() < startSeq) {
             unacked.pollFirstEntry();
+//            System.out.println("  First KEY " + unacked.firstKey());
         }
     }
 
@@ -116,7 +122,9 @@ public class TTPConnection {
     }
 
     public int firstUnacked() {
-        return unacked.firstKey();
+        synchronized (unacked) {
+            return unacked.firstKey();
+        }
     }
 
     public void setLastAcked(int seqNum) {
@@ -188,7 +196,7 @@ public class TTPConnection {
         return receivedFIN;
     }
 
-    public synchronized void setReceivedFIN(boolean receivedFIN) {
+    synchronized void setReceivedFIN(boolean receivedFIN) {
         this.receivedFIN = receivedFIN;
     }
 
@@ -200,12 +208,8 @@ public class TTPConnection {
         this.receivedFINACK = receivedFINACK;
     }
 
-    public synchronized boolean isReceivedDATA() {
-        return receivedDATA;
-    }
-
-    public synchronized void setReceivedDATA(boolean receivedDATA) {
-        this.receivedDATA = receivedDATA;
+    boolean hasData() {
+        return !dataQueue.isEmpty();
     }
 
     synchronized boolean isReceivedSYN() {
@@ -228,18 +232,20 @@ public class TTPConnection {
     void addToQueue(Datagram datagram) {
 
         TTPSegment segment = (TTPSegment) datagram.getData();
-        System.out.println("  Add "+segment.getType().toString() +" segment to queue");
 
         if (segment.getType() == TTPSegment.Type.ACK) {
             // do not enqueue
+            return;
         } else if (segment.getType() == TTPSegment.Type.DATA || segment.getType() == TTPSegment.Type.EOF) {
             dataQueue.offer(datagram);
         } else {
             controlQueue.offer(datagram);
         }
+
+        System.out.println("  Add "+segment.getType().toString() +" segment to queue");
     }
 
-    Datagram retrieve(TTPSegment.Type type) {
+    public Datagram retrieve(TTPSegment.Type type) {
 
         System.out.println("  Retrieve "+type.toString() +" segment from queue");
 
@@ -258,5 +264,16 @@ public class TTPConnection {
         TTPSegment segment = (TTPSegment) datagram.getData();
         System.out.println("  Retrieve "+segment.getType().toString() +" segment from queue");
         return datagram;
+    }
+
+    void waitForACK(int ackNum) {
+        pendingACK = ackNum;
+    }
+
+    int waitingForACK() {
+//        if (pendingACK > 0) {
+            System.out.println("  Waiting for ACK for " + pendingACK);
+//        }
+        return pendingACK;
     }
 }
