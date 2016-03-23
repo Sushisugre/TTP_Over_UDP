@@ -4,11 +4,10 @@
 
 package applications;
 
-import java.io.IOException;
-import java.net.SocketException;
-
-import services.DatagramService;
 import datatypes.Datagram;
+import services.DatagramService;
+
+import java.io.IOException;
 
 public class client {
 
@@ -41,7 +40,7 @@ public class client {
 		
 		datagram = ds.receiveDatagram();
 		System.out.println("Received " + datagram.getData());
-	}
+		}
 	
 	private static void printUsage() {
 		System.out.println("Usage: server <localport> <serverport>\n");
