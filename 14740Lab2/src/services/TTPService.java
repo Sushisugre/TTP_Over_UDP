@@ -29,15 +29,16 @@ public class TTPService {
      * @throws ClassNotFoundException
      */
     public TTPConnection accept() throws IOException, ClassNotFoundException{
+        System.out.println("Waiting for client connection");
         TTPConnection conn = new TTPConnection(winSize, timeout, this);
         ReceiverThread receiver = new ReceiverThread(conn);
-        receiver.start();
         conn.setReceiver(receiver);
 
 
         DatagramService ds = new DatagramService(srcPort, 10);
-        Datagram datagram = ds.receiveDatagram();
         conn.setDatagramService(ds);
+        receiver.start();
+
 
         boolean isSYN = false;
 
@@ -47,17 +48,17 @@ public class TTPService {
 
         TTPSegment segment = null;
         while (!isSYN) {
-            segment = (TTPSegment) datagram.getData();
-
-            if (segment.getType() != TTPSegment.Type.SYN) {
-                continue;
-            }
-
-            conn.setSrcAddr(datagram.getDstaddr());
-            conn.setSrcPort(datagram.getDstport());
-            conn.setDstAddr(datagram.getSrcaddr());
-            conn.setDstPort(datagram.getSrcport());
-            isSYN = true;
+//            segment = (TTPSegment) datagram.getData();
+//
+//            if (segment.getType() != TTPSegment.Type.SYN) {
+//                continue;
+//            }
+//
+//            conn.setSrcAddr(datagram.getDstaddr());
+//            conn.setSrcPort(datagram.getDstport());
+//            conn.setDstAddr(datagram.getSrcaddr());
+//            conn.setDstPort(datagram.getSrcport());
+//            isSYN = true;
         }
 
         TTPSegment synack = packSegment(conn, TTPSegment.Type.SYN_ACK, segment.getAckNum(), null);
@@ -77,9 +78,9 @@ public class TTPService {
         DatagramService ds = new DatagramService(srcPort, verbose);
         TTPConnection conn = new TTPConnection(winSize,timeout,this);
         ReceiverThread receiver = new ReceiverThread(conn);
-        receiver.start();
         conn.setReceiver(receiver);
         conn.setDatagramService(ds);
+        receiver.start();
 
         conn.setSrcAddr(srcAddr);
         conn.setSrcPort(srcPort);
@@ -90,6 +91,7 @@ public class TTPService {
         sendSegment(conn, segment);
 
         // wait for SYNACK
+        while (!conn.isReceivedSYNACK());
 
         return conn;
     }
@@ -136,17 +138,28 @@ public class TTPService {
         datagram.setDstport(conn.getDstPort());
         datagram.setSrcport(conn.getSrcPort());
         datagram.setSize((short) DataUtil.objectToByte(segment).length);
+        datagram.setChecksum((short) 0);
+        System.out.format("Checksum of sent: %s \n" , Integer.toHexString(DataUtil.getUDPCheckSum(DataUtil.objectToByte(datagram))));
         datagram.setChecksum(DataUtil.getUDPCheckSum(DataUtil.objectToByte(datagram)));
+        System.out.format("Checksum of sent: %s \n" , Integer.toHexString(datagram.getChecksum()));
+        System.out.format("Checksum of sent: %s \n" , Integer.toHexString(DataUtil.getUDPCheckSum(DataUtil.objectToByte(datagram))));
 
+        sentDatagram(conn, datagram);
+
+        return true;
+    }
+
+    void sentDatagram(TTPConnection conn, Datagram datagram) throws IOException{
         DatagramService ds = conn.getDatagramService();
         ds.sendDatagram(datagram);
 
+        TTPSegment segment = (TTPSegment) datagram.getData();
+        System.out.println("Send Segment: " + segment.getSeqNum());
+
         if (segment.getType() != TTPSegment.Type.ACK) {
             if (!conn.hasUnacked()) conn.startTimer();
-            conn.addToWindow(segment);
+            conn.addToWindow(segment.getSeqNum(), datagram);
         }
-
-        return true;
     }
 
     public byte[] receive(TTPConnection conn) throws ClassNotFoundException, IOException{
@@ -188,12 +201,15 @@ public class TTPService {
      */
     private TTPSegment receiveSegment(TTPConnection conn) throws ClassNotFoundException, IOException{
 
+        System.out.println("Receive Segment");
+
         DatagramService ds = conn.getDatagramService();
         Datagram datagram = ds.receiveDatagram();
         TTPSegment segment = (TTPSegment) datagram.getData();
 
         // checksum error
         if (!validateChecksum(datagram)) {
+            System.err.println("Checksum error");
             sendAck(conn, conn.lastAcked());
             return null;
         }
@@ -254,7 +270,7 @@ public class TTPService {
         segment.setType(type);
         segment.setSeqNum(conn.getNextSeq());
         segment.setData(data);
-        segment.setSize(data.length);
+        if(data != null)segment.setSize(data.length);
         if (type == TTPSegment.Type.ACK
                 || type == TTPSegment.Type.SYN_ACK
                 || type == TTPSegment.Type.FIN_ACK)
@@ -264,14 +280,19 @@ public class TTPService {
     }
 
     private void sendAck(TTPConnection conn, int endSeq) throws IOException{
+        System.out.println("Sending ACK for seqNum: "+endSeq);
         TTPSegment segment = packSegment(conn, TTPSegment.Type.ACK, endSeq, null);
         sendSegment(conn, segment);
         conn.setLastAcked(endSeq);
     }
 
     private boolean validateChecksum(Datagram datagram){
+        short expected = datagram.getChecksum();
+        datagram.setChecksum((short) 0);
         byte[] received = DataUtil.objectToByte(datagram);
-        return DataUtil.getUDPCheckSum(received) == -1;
+        System.out.format("Checksum of received: %s \n" , Integer.toHexString(DataUtil.getUDPCheckSum(received)));
+//        return DataUtil.getUDPCheckSum(received) == -1;
+        return expected == DataUtil.getUDPCheckSum(received);
     }
 
     static class ReceiverThread extends Thread {

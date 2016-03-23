@@ -27,7 +27,7 @@ public class FTPClient {
         String path = args[3];
 
         TTPService ttpService = new TTPService(winSize, timeout, port);
-        TTPConnection conn = ttpService.connect("127.0.0.1", (short) 65531, "127.0.0.1", (short) 65530, 10);
+        TTPConnection conn = ttpService.connect("127.0.0.1", (short) 2048, "127.0.0.1", (short) 4096, 10);
 
 
         boolean isValid = false;

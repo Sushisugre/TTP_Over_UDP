@@ -48,8 +48,8 @@ public class DataUtil {
         int sum = 0;
 
         // divide data into 16 bits words, add then together
-        for (int i=0; i<length; i=i+2){
-            int word =((data[i]<<8) & 0xFF00);
+        for (int i = 0; i<length; i = i+2){
+            int word = ((data[i]<<8) & 0xFF00);
             if( i+1 < length ) word += (data[i+1] & 0xFF);
             sum += word;
 
@@ -62,6 +62,7 @@ public class DataUtil {
         sum = ~sum;
         sum = sum & 0xFFFF;
         return (short) sum;
+
     }
 
     public static String getMD5Checksum(String path) throws FileNotFoundException{

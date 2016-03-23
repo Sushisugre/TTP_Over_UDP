@@ -1,6 +1,6 @@
 package services;
 
-import datatypes.TTPSegment;
+import datatypes.Datagram;
 
 import java.io.IOException;
 import java.util.Map;
@@ -29,7 +29,7 @@ public class TTPConnection {
     // timer for oldest unacked packet
     private Timer timer;
     // key: seq number, value: datagram
-    private ConcurrentSkipListMap<Integer, TTPSegment> unacked;
+    private ConcurrentSkipListMap<Integer, Datagram> unacked;
 
     private DatagramService ds;
 
@@ -73,9 +73,13 @@ public class TTPConnection {
      * resend all the unacked packet in the window
      */
     public void resend() throws IOException{
-        for(Map.Entry<Integer, TTPSegment> entry : unacked.entrySet()) {
-            TTPSegment segment = entry.getValue();
-            ttpService.sendSegment(this, segment);
+        System.err.println("Timeout: Start to resent the segments in window...");
+
+        for(Map.Entry<Integer, Datagram> entry : unacked.entrySet()) {
+            System.err.println("Resend: seq num " + entry.getKey());
+            Datagram datagram = entry.getValue();
+            ttpService.sentDatagram(this, datagram);
+            startTimer();
         }
     }
 
@@ -84,7 +88,7 @@ public class TTPConnection {
     }
 
     public boolean hasUnacked() {
-        return unacked.isEmpty();
+        return !unacked.isEmpty();
     }
 
     public void moveWindowTo(int startSeq) {
@@ -93,8 +97,8 @@ public class TTPConnection {
         }
     }
 
-    public void addToWindow(TTPSegment segment) {
-        unacked.put(segment.getSeqNum(), segment);
+    public void addToWindow(int seqNum, Datagram datagram) {
+        unacked.put(seqNum, datagram);
     }
 
     public int firstUnacked() {
