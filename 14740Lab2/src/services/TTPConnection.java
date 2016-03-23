@@ -67,6 +67,7 @@ public class TTPConnection {
 
     public void startTimer() {
         System.out.println("  Start timer");
+        initTimer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -82,7 +83,6 @@ public class TTPConnection {
     public void endTimer(){
         System.out.println("  End timer");
         timer.cancel();
-        initTimer();
     }
 
     /**
@@ -272,7 +272,7 @@ public class TTPConnection {
 
     int waitingForACK() {
 //        if (pendingACK > 0) {
-            System.out.println("  Waiting for ACK for " + pendingACK);
+//            System.out.println("  Waiting for ACK for " + pendingACK);
 //        }
         return pendingACK;
     }

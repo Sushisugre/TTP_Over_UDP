@@ -41,6 +41,7 @@ public class FTPServer {
                 TTPConnection conn = ttpService.accept();
                 RequestHandler handler = new RequestHandler(conn);
                 threadPool.execute(handler);
+                Thread.sleep(100000000);
             } catch (Exception e){
                 e.printStackTrace();
             }
@@ -109,8 +110,9 @@ public class FTPServer {
 
 
             } catch (FileNotFoundException e){
+                e.printStackTrace();
             } catch (Exception e) {
-
+                e.printStackTrace();
             }
 
 

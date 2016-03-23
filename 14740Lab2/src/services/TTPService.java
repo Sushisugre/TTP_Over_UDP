@@ -243,6 +243,7 @@ public class TTPService {
 
         switch (segment.getType()) {
             case ACK:
+                while (!conn.hasUnacked());
                 // cumulative ack, so the ack num may be larger than first unacked
                 System.out.println("  ACK ackNum:"+segment.getAckNum()+", firstUnacked:"+conn.firstUnacked());
                 if (segment.getAckNum() >= conn.firstUnacked()) {
