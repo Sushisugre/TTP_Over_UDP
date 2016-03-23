@@ -1,12 +1,14 @@
 package services;
 
 import datatypes.Datagram;
+import datatypes.TTPSegment;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.LinkedBlockingQueue;
 
 
 public class TTPConnection {
@@ -30,6 +32,8 @@ public class TTPConnection {
     private Timer timer;
     // key: seq number, value: datagram
     private ConcurrentSkipListMap<Integer, Datagram> unacked;
+    private LinkedBlockingQueue<Datagram> dataQueue;
+    private LinkedBlockingQueue<Datagram> controlQueue;
 
     private DatagramService ds;
 
@@ -46,12 +50,18 @@ public class TTPConnection {
         this.ttpService = ttpService;
 
         unacked = new ConcurrentSkipListMap<>();
-        timer = new Timer();
+        dataQueue = new LinkedBlockingQueue<>();
+        controlQueue = new LinkedBlockingQueue<>();
         nextSeq = ISN;
         lastAcked = ISN - 1;
     }
 
+    public void initTimer() {
+        timer = new Timer();
+    }
+
     public void startTimer() {
+        System.out.println("Start timer");
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -66,6 +76,7 @@ public class TTPConnection {
 
     public void endTimer(){
         timer.cancel();
+        initTimer();
     }
 
     /**
@@ -75,11 +86,11 @@ public class TTPConnection {
     public void resend() throws IOException{
         System.err.println("Timeout: Start to resent the segments in window...");
 
+        endTimer();
+        startTimer();
         for(Map.Entry<Integer, Datagram> entry : unacked.entrySet()) {
-            System.err.println("Resend: seq num " + entry.getKey());
             Datagram datagram = entry.getValue();
             ttpService.sentDatagram(this, datagram);
-            startTimer();
         }
     }
 
@@ -91,13 +102,16 @@ public class TTPConnection {
         return !unacked.isEmpty();
     }
 
-    public void moveWindowTo(int startSeq) {
+    void moveWindowTo(int startSeq) {
+        System.out.println("  Move window to "+startSeq);
         while (unacked.firstKey() < startSeq) {
+            System.out.println("First KEY " + unacked.firstKey());
             unacked.pollFirstEntry();
         }
     }
 
     public void addToWindow(int seqNum, Datagram datagram) {
+        System.out.println("  Add "+seqNum+" to unacked window");
         unacked.put(seqNum, datagram);
     }
 
@@ -106,6 +120,7 @@ public class TTPConnection {
     }
 
     public void setLastAcked(int seqNum) {
+        System.out.println("  Set last acked " + seqNum);
         lastAcked = seqNum;
     }
 
@@ -149,11 +164,11 @@ public class TTPConnection {
         this.dstPort = dstPort;
     }
 
-    public DatagramService getDatagramService() {
+    DatagramService getDatagramService() {
         return ds;
     }
 
-    public void setDatagramService(DatagramService ds) {
+    void setDatagramService(DatagramService ds) {
         this.ds = ds;
     }
 
@@ -161,15 +176,15 @@ public class TTPConnection {
         return ttpService;
     }
 
-    public TTPService.ReceiverThread getReceiver() {
+    TTPService.ReceiverThread getReceiver() {
         return receiver;
     }
 
-    public void setReceiver(TTPService.ReceiverThread receiver) {
+    void setReceiver(TTPService.ReceiverThread receiver) {
         this.receiver = receiver;
     }
 
-    public synchronized boolean isReceivedFIN() {
+    synchronized boolean isReceivedFIN() {
         return receivedFIN;
     }
 
@@ -177,11 +192,11 @@ public class TTPConnection {
         this.receivedFIN = receivedFIN;
     }
 
-    public synchronized boolean isReceivedFINACK() {
+    synchronized boolean isReceivedFINACK() {
         return receivedFINACK;
     }
 
-    public synchronized void setReceivedFINACK(boolean receivedFINACK) {
+    synchronized void setReceivedFINACK(boolean receivedFINACK) {
         this.receivedFINACK = receivedFINACK;
     }
 
@@ -193,20 +208,55 @@ public class TTPConnection {
         this.receivedDATA = receivedDATA;
     }
 
-    public synchronized boolean isReceivedSYN() {
+    synchronized boolean isReceivedSYN() {
         return receivedSYN;
     }
 
-    public synchronized void setReceivedSYN(boolean receivedSYN) {
+    synchronized void setReceivedSYN(boolean receivedSYN) {
         this.receivedSYN = receivedSYN;
     }
 
 
-    public synchronized boolean isReceivedSYNACK() {
+    synchronized boolean isReceivedSYNACK() {
         return receivedSYNACK;
     }
 
-    public synchronized void setReceivedSYNACK(boolean receivedSYNACK) {
+    synchronized void setReceivedSYNACK(boolean receivedSYNACK) {
         this.receivedSYNACK = receivedSYNACK;
+    }
+
+    void addToQueue(Datagram datagram) {
+
+        TTPSegment segment = (TTPSegment) datagram.getData();
+        System.out.println("  Add "+segment.getType().toString() +" segment to queue");
+
+        if (segment.getType() == TTPSegment.Type.ACK) {
+            // do not enqueue
+        } else if (segment.getType() == TTPSegment.Type.DATA || segment.getType() == TTPSegment.Type.EOF) {
+            dataQueue.offer(datagram);
+        } else {
+            controlQueue.offer(datagram);
+        }
+    }
+
+    Datagram retrieve(TTPSegment.Type type) {
+
+        System.out.println("  Retrieve "+type.toString() +" segment from queue");
+
+        if (type == TTPSegment.Type.ACK) {
+            return null;
+        } else if (type == TTPSegment.Type.DATA || type == TTPSegment.Type.EOF) {
+            return dataQueue.poll();
+        } else {
+            return controlQueue.poll();
+        }
+    }
+
+    Datagram retrieveData() {
+
+        Datagram datagram = dataQueue.poll();
+        TTPSegment segment = (TTPSegment) datagram.getData();
+        System.out.println("  Retrieve "+segment.getType().toString() +" segment from queue");
+        return datagram;
     }
 }

@@ -4,6 +4,11 @@ import java.io.Serializable;
 
 public class TTPSegment implements Serializable {
 
+    /**
+     * Use a large value here to save the trouble of calculate object size
+     */
+    public static final int HEADER_SIZE = 50;
+
     public enum Type {
         SYN,
         ACK,
@@ -11,12 +16,7 @@ public class TTPSegment implements Serializable {
         FIN,
         FIN_ACK,
         DATA, // contains data, there's more following, needs reassemble
-        EOF,  // contains data, and it's the last fragment
-        RST;
-
-        public static Type fromString(String s) throws IllegalArgumentException {
-            return Type.valueOf(s.toUpperCase());
-        }
+        EOF;  // contains data, and it's the last fragment
     }
 
     private Type type;
