@@ -388,10 +388,12 @@ public class TTPService {
             return;
         }
 
-        // out of order
-        if (segment.getSeqNum() != conn.lastAcked() + 1) {
-            System.out.println("Out of order: expected - "+(conn.lastAcked()+1)+", got - " + segment.getSeqNum());
-            sendAck(conn, conn.lastAcked());
+        // out of order, ack is an exception because we allow cumulative ACK
+        // Don't reply anything, just let it timeout, i.e. no fast retransmission
+        if (!(segment.getType() == TTPSegment.Type.ACK
+                || segment.getSeqNum() == conn.lastAcked() + 1)) {
+            System.out.println("===> Out of order: expected - "+(conn.lastAcked()+1)+", got - " + segment.getSeqNum());
+//            sendAck(conn, conn.lastAcked());
             return;
         }
 
@@ -401,8 +403,12 @@ public class TTPService {
                 while (!conn.hasUnacked());
                 // cumulative ack, so the ack num may be larger than first unacked
                 System.out.println("  ACK ackNum:"+segment.getAckNum()+", firstUnacked:"+conn.firstUnacked());
-                handleACK(segment, conn);
+
+                if (segment.getAckNum() >= conn.firstUnacked()) {
+                    handleACK(segment, conn);
+                }
                 conn.setLastAcked(segment.getSeqNum());
+
                 break;
             case SYN:
                 conn.setReceivedSYN(true);
@@ -439,12 +445,14 @@ public class TTPService {
 
     /**
      * Handle connection timer and window after receiving an ACK
+     * move window, reset timer
      *
      * @param segment segment
      * @param conn connection
      */
     private void handleACK(TTPSegment segment, TTPConnection conn) {
-        if (segment.getAckNum() >= conn.firstUnacked()) {
+
+        if (conn.hasUnacked() && segment.getAckNum() >= conn.firstUnacked()) {
             conn.moveWindowTo(segment.getAckNum() + 1);
             if (conn.hasUnacked()) {
                 conn.endTimer();
@@ -452,8 +460,6 @@ public class TTPService {
             } else {
                 conn.endTimer();
             }
-        } else {
-            conn.endTimer();
         }
     }
 

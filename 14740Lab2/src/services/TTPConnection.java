@@ -115,7 +115,7 @@ public class TTPConnection {
      * resend all the unacked packet in the window
      */
     public void resend() throws IOException{
-        System.err.println("Timeout: Start to resent the segments in window...");
+        System.err.println("===> Timeout: Start to resent the segments in window...");
 
         endTimer();
         startTimer();
