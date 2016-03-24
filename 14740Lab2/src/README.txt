@@ -40,3 +40,4 @@ services/
                         # java applications.FTPClient 2049 5 15000 small_file.txt
 
                         # The document that client received will have a _copy suffix
+                        # In client, it makes assumption that server is started as

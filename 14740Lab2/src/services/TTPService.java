@@ -400,10 +400,9 @@ public class TTPService {
                 +" " + segment.getType().toString()
                 + ", last acked " + conn.lastAcked());
 
-        // checksum error
+        // checksum error, discard
         if (!validateChecksum(datagram)) {
-            System.err.println("Checksum error");
-            sendAck(conn, conn.lastAcked());
+            System.err.println("===> Checksum error");
             return false;
         }
 

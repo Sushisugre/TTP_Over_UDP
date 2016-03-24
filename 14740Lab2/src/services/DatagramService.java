@@ -48,13 +48,22 @@ public class DatagramService {
 		TTPSegment segment = (TTPSegment) datagram.getData();
 		int seqNum = segment.getSeqNum();
 
-		socket.send(packet);
+//		socket.send(packet);
 
 
-//		// Send packet
-//		int rand = randInt(0,500);
+		// Send packet
+		int rand = randInt(0,500);
+
+		if (rand == 44) {
+			byte flip = 1;
+			System.out.println("Original byte: " + data[data.length - 10]);
+			data[data.length - 10] = (byte) (data[data.length - 10] ^ flip);
+			System.out.println("Changed byte: " + data[data.length - 10]);
+			System.out.println("===> This packet has been modified " + seqNum);
+		}
+
 //		if (rand != 22) {
-//			socket.send(packet);
+			socket.send(packet);
 //		} else {
 //			System.out.println("===> Drop this packet " + seqNum);
 //		}

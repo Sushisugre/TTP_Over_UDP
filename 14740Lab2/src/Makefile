@@ -38,7 +38,7 @@ TTPService.class:    services/TTPService.java
 	javac $<
 
 start_server:
-	java applications.FTPServer 4096 5 10000
+	java applications.FTPServer 4096 5 5000
 
 start_client1:
 	java applications.FTPClient 2048 5 15000 10m.txt

@@ -44,7 +44,7 @@ public class FTPServer {
             try{
 
                 // receive a connection
-                TTPConnection conn = ttpService.accept("127.0.0.1", (short) 4096);
+                TTPConnection conn = ttpService.accept("127.0.0.1", (short) port);
                 System.out.println("Server: got connection from " + conn.getTag());
 
                 // send the connection to handler thread
