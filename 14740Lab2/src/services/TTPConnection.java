@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class TTPConnection {
 
-    private static final int ISN = 1024;
+    public static final int ISN = 1024;
 
     private int winSize;
     private int timeout;
@@ -25,25 +25,21 @@ public class TTPConnection {
     private String dstAddr;
     private short dstPort;
 
-    private TTPService.ReceiverThread receiver;
     private TTPService ttpService;
 
     // timer for oldest unacked packet
     private Timer timer;
     // key: seq number, value: datagram
     private ConcurrentSkipListMap<Integer, Datagram> unacked;
+    // Queue which buffers the received DATA/EOF TTPSegment
     private ConcurrentLinkedQueue<Datagram> dataQueue;
+    // Queue which buffers the received SYN/SYN_ACK/FIN/FIN_ACK TTPSegment
     private ConcurrentLinkedQueue<Datagram> controlQueue;
-
-    private DatagramService ds;
 
     private boolean receivedSYN;
     private boolean receivedFIN;
     private boolean receivedSYNACK;
     private boolean receivedFINACK;
-
-    private int pendingACK;
-
 
     public TTPConnection(int winSize, int timeout, TTPService ttpService) {
         this.winSize = winSize;
@@ -57,17 +53,20 @@ public class TTPConnection {
         lastAcked = ISN - 1;
     }
 
+    public String getTag() {
+        return dstAddr + ":" +dstPort;
+    }
+
     ConcurrentSkipListMap<Integer, Datagram> getUnacked() {
         return unacked;
     }
 
-    public void initTimer() {
-        timer = new Timer();
-    }
-
+    /**
+     * Start or restart timer for oldest datagram in the window
+     */
     public void startTimer() {
         System.out.println("  Start timer");
-        initTimer();
+        timer = new Timer();
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
@@ -80,6 +79,10 @@ public class TTPConnection {
         }, timeout);
     }
 
+    /**
+     * Stop timer when receiving an valid ACK
+     * Restart the timer if unacked window is not empty
+     */
     public void endTimer(){
         System.out.println("  End timer");
         timer.cancel();
@@ -100,9 +103,14 @@ public class TTPConnection {
         }
     }
 
+    /**
+     * Is window full? Can we send more packet without waiting for ACKs?
+     * @return isWindowFull
+     */
     public boolean isWindowFull() {
         return unacked.size() == winSize;
     }
+
 
     public boolean hasUnacked() {
         return !unacked.isEmpty();
@@ -112,7 +120,6 @@ public class TTPConnection {
         System.out.println("  Move window to "+startSeq);
         while (!unacked.isEmpty() && unacked.firstKey() < startSeq) {
             unacked.pollFirstEntry();
-//            System.out.println("  First KEY " + unacked.firstKey());
         }
     }
 
@@ -170,26 +177,6 @@ public class TTPConnection {
 
     public void setDstPort(short dstPort) {
         this.dstPort = dstPort;
-    }
-
-    DatagramService getDatagramService() {
-        return ds;
-    }
-
-    void setDatagramService(DatagramService ds) {
-        this.ds = ds;
-    }
-
-    public TTPService getTtpService() {
-        return ttpService;
-    }
-
-    TTPService.ReceiverThread getReceiver() {
-        return receiver;
-    }
-
-    void setReceiver(TTPService.ReceiverThread receiver) {
-        this.receiver = receiver;
     }
 
     synchronized boolean isReceivedFIN() {
@@ -266,14 +253,4 @@ public class TTPConnection {
         return datagram;
     }
 
-    void waitForACK(int ackNum) {
-        pendingACK = ackNum;
-    }
-
-    int waitingForACK() {
-//        if (pendingACK > 0) {
-//            System.out.println("  Waiting for ACK for " + pendingACK);
-//        }
-        return pendingACK;
-    }
 }

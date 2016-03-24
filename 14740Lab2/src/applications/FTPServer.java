@@ -10,6 +10,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.net.SocketException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -23,7 +24,7 @@ public class FTPServer {
 
 
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws SocketException{
         if(args.length != 3) {
             printUsage();
         }
@@ -37,17 +38,26 @@ public class FTPServer {
         ttpService = new TTPService(winSize, timeout, port);
 
         while (true) {
+            System.out.println(" waiting for accept");
             try{
-                TTPConnection conn = ttpService.accept();
+
+                // receive a connection
+                TTPConnection conn = ttpService.accept("127.0.0.1", (short) 4096);
+                System.out.println("Server: got connection "+conn.getTag());
+
+                // send the connection to handler thread
                 RequestHandler handler = new RequestHandler(conn);
                 threadPool.execute(handler);
-                Thread.sleep(100000000);
+//                Thread.sleep(100000000);
             } catch (Exception e){
                 e.printStackTrace();
             }
         }
     }
 
+    /**
+     * Handler that take care of different clients
+     */
     static class RequestHandler implements Runnable {
 
         private TTPConnection conn;
@@ -108,13 +118,11 @@ public class FTPServer {
                     }
                 }
 
-
             } catch (FileNotFoundException e){
                 e.printStackTrace();
             } catch (Exception e) {
                 e.printStackTrace();
             }
-
 
         }
     }

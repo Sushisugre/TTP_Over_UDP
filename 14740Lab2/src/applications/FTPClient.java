@@ -27,7 +27,8 @@ public class FTPClient {
         String path = args[3];
 
         TTPService ttpService = new TTPService(winSize, timeout, port);
-        TTPConnection conn = ttpService.connect("127.0.0.1", (short) 2048, "127.0.0.1", (short) 4096, 10);
+        TTPConnection conn = ttpService.connect("127.0.0.1", (short) port, "127.0.0.1", (short) 4096);
+        System.out.println("Server: got connection "+conn.getTag());
 
 
         boolean isValid = false;
