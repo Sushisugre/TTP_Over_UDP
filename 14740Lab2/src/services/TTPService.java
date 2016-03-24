@@ -9,7 +9,9 @@ import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
 
-
+/**
+ * Implementation of trusted trasportation protocol over UDP
+ */
 public class TTPService {
     // retransmission timer interval
     private int timeout;
@@ -17,8 +19,12 @@ public class TTPService {
     private int winSize;
     // underline facility for data transmission
     private DatagramService ds;
+    // table of all the established connection through this TTPService instance
     private Hashtable<String, TTPConnection> connections;
+    // table of all the pending connection (not accepted)
     private Hashtable<String, TTPConnection> pendingConnection;
+    // receiver thread that keep running in the background, fetching data from DatagramService
+    // and distributed to different connections
     private TTPService.ReceiverThread receiver;
 
     public TTPService(int winSize, int timeout, int port) throws SocketException{
@@ -415,13 +421,24 @@ public class TTPService {
         }
     }
 
-    private void sendAck(TTPConnection conn, int endSeq) throws IOException{
-        System.out.println("Sending ACK for seqNum: "+endSeq);
-        TTPSegment segment = packSegment(conn, TTPSegment.Type.ACK, endSeq, null);
+    /**
+     * Helper method to send ACK
+     * @param conn connection
+     * @param seqNum the sequence of the segment ACKed
+     * @throws IOException
+     */
+    private void sendAck(TTPConnection conn, int seqNum) throws IOException{
+        System.out.println("Sending ACK for seqNum: " + seqNum);
+        TTPSegment segment = packSegment(conn, TTPSegment.Type.ACK, seqNum, null);
         sendSegment(conn, segment);
-        conn.setLastAcked(endSeq);
+        conn.setLastAcked(seqNum);
     }
 
+    /**
+     * Helper method to validate UDP checksum
+     * @param datagram UDP datagram
+     * @return isValid
+     */
     private boolean validateChecksum(Datagram datagram){
         short expected = datagram.getChecksum();
         datagram.setChecksum((short) 0);
@@ -436,18 +453,12 @@ public class TTPService {
      */
     class ReceiverThread extends Thread {
 
-        TTPService ttpService;
-
-        public ReceiverThread() {
-            this.ttpService = TTPService.this;
-        }
-
         @Override
         public void run() {
             System.out.println("Receiver thread started");
             while (!currentThread().isInterrupted()) {
                 try {
-                    ttpService.receiveSegment();
+                    TTPService.this.receiveSegment();
 
                 } catch (IOException e){
                     e.printStackTrace();

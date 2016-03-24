@@ -10,21 +10,29 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-
+/**
+ * Simulate a TCP socket between 2 hosts
+ */
 public class TTPConnection {
 
+    // Initial Sequence Number
     public static final int ISN = 1024;
-
+    // window size
     private int winSize;
+    // retransmission timer interval
     private int timeout;
+    // next sequence number to send
     private int nextSeq;
+    // last acked segment - use when working as receiver
     private int lastAcked;
 
+    // address info of source and destination
     private String srcAddr;
     private short srcPort;
     private String dstAddr;
     private short dstPort;
 
+    // a handle to TTPService the connection uses
     private TTPService ttpService;
 
     // timer for oldest unacked packet
@@ -36,6 +44,8 @@ public class TTPConnection {
     // Queue which buffers the received SYN/SYN_ACK/FIN/FIN_ACK TTPSegment
     private ConcurrentLinkedQueue<Datagram> controlQueue;
 
+    // ReceiverThread will update this field
+    // Which are used in spin lock to synchronize TTP flow
     private boolean receivedSYN;
     private boolean receivedFIN;
     private boolean receivedSYNACK;
@@ -53,16 +63,18 @@ public class TTPConnection {
         lastAcked = ISN - 1;
     }
 
+    /**
+     * Tag that identifies each connection that associated with a server/TTPService
+     * @return tag
+     */
     public String getTag() {
         return dstAddr + ":" +dstPort;
     }
 
-    ConcurrentSkipListMap<Integer, Datagram> getUnacked() {
-        return unacked;
-    }
 
     /**
-     * Start or restart timer for oldest datagram in the window
+     * Start or restart timer for oldest datagram in the window,
+     * when timeout, resend all the packets in the window
      */
     public void startTimer() {
         System.out.println("  Start timer");
@@ -111,11 +123,18 @@ public class TTPConnection {
         return unacked.size() == winSize;
     }
 
-
+    /**
+     * Is there any packet haven't been ACKed in this connection?
+     * @return hasUnacked
+     */
     public boolean hasUnacked() {
         return !unacked.isEmpty();
     }
 
+    /**
+     * After received a valid ACK, slide the window
+     * @param startSeq oldest unacknowledged packet
+     */
     void moveWindowTo(int startSeq) {
         System.out.println("  Move window to "+startSeq);
         while (!unacked.isEmpty() && unacked.firstKey() < startSeq) {
@@ -123,19 +142,78 @@ public class TTPConnection {
         }
     }
 
+    /**
+     * After send a packet, add it to the unacknowledged window
+     * @param seqNum sequence number
+     * @param datagram Datagram
+     */
     public void addToWindow(int seqNum, Datagram datagram) {
         System.out.println("  Add "+seqNum+" to unacked window");
         unacked.put(seqNum, datagram);
     }
 
+    /**
+     * First unacknowledged packet in the window
+     * @return seqNum
+     */
     public int firstUnacked() {
         synchronized (unacked) {
             return unacked.firstKey();
         }
     }
 
+    /**
+     * ReceiverThread use this method to distribute received packets to the queues in different connections
+     * @param datagram Datagram
+     */
+    void addToQueue(Datagram datagram) {
+
+        TTPSegment segment = (TTPSegment) datagram.getData();
+
+        if (segment.getType() == TTPSegment.Type.ACK) {
+            // do not enqueue
+            return;
+        } else if (segment.getType() == TTPSegment.Type.DATA || segment.getType() == TTPSegment.Type.EOF) {
+            dataQueue.offer(datagram);
+        } else {
+            controlQueue.offer(datagram);
+        }
+
+        System.out.println("  Add "+segment.getType().toString() +" segment to queue");
+    }
+
+    /**
+     * Retrieve a certain type of packet from queue
+     *
+     * @param type TTPSegment type
+     * @return Datagram that contains Segment of required type
+     */
+    Datagram retrieve(TTPSegment.Type type) {
+
+        System.out.println("  Retrieve "+type.toString() +" segment from queue");
+
+        if (type == TTPSegment.Type.ACK) {
+            return null;
+        } else if (type == TTPSegment.Type.DATA || type == TTPSegment.Type.EOF) {
+            return dataQueue.poll();
+        } else {
+            return controlQueue.poll();
+        }
+    }
+
+    /**
+     * Retrieve a DATA packet from queue
+     * @return Datagram that contains a DATA TTPSegment
+     */
+    Datagram retrieveData() {
+
+        Datagram datagram = dataQueue.poll();
+        TTPSegment segment = (TTPSegment) datagram.getData();
+        System.out.println("  Retrieve "+segment.getType().toString() +" segment from queue");
+        return datagram;
+    }
+
     public void setLastAcked(int seqNum) {
-        System.out.println("  Set last acked " + seqNum);
         lastAcked = seqNum;
     }
 
@@ -216,41 +294,5 @@ public class TTPConnection {
         this.receivedSYNACK = receivedSYNACK;
     }
 
-    void addToQueue(Datagram datagram) {
-
-        TTPSegment segment = (TTPSegment) datagram.getData();
-
-        if (segment.getType() == TTPSegment.Type.ACK) {
-            // do not enqueue
-            return;
-        } else if (segment.getType() == TTPSegment.Type.DATA || segment.getType() == TTPSegment.Type.EOF) {
-            dataQueue.offer(datagram);
-        } else {
-            controlQueue.offer(datagram);
-        }
-
-        System.out.println("  Add "+segment.getType().toString() +" segment to queue");
-    }
-
-    public Datagram retrieve(TTPSegment.Type type) {
-
-        System.out.println("  Retrieve "+type.toString() +" segment from queue");
-
-        if (type == TTPSegment.Type.ACK) {
-            return null;
-        } else if (type == TTPSegment.Type.DATA || type == TTPSegment.Type.EOF) {
-            return dataQueue.poll();
-        } else {
-            return controlQueue.poll();
-        }
-    }
-
-    Datagram retrieveData() {
-
-        Datagram datagram = dataQueue.poll();
-        TTPSegment segment = (TTPSegment) datagram.getData();
-        System.out.println("  Retrieve "+segment.getType().toString() +" segment from queue");
-        return datagram;
-    }
 
 }

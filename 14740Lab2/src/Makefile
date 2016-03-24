@@ -39,15 +39,13 @@ start_server:
 	java applications.FTPServer 4096 10 15000
 
 start_client1:
-	java applications.FTPClient 2048 5 15000 big_file.txt
+	java applications.FTPClient 2048 5 15000 10m.txt
 
 start_client2:
 	java applications.FTPClient 2049 5 15000 small_file.txt
 
-
-
 clean:
-	rm -f *.class
+	rm -f applications/*.class datatypes/*.class services/*.class
 
 
 

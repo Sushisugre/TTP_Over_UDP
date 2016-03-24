@@ -12,6 +12,9 @@ import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+/**
+ * FTPClient that requests file from FTPServer
+ */
 public class FTPClient {
 
     public static void main(String[] args) throws ClassNotFoundException, IOException{
@@ -29,7 +32,6 @@ public class FTPClient {
         TTPService ttpService = new TTPService(winSize, timeout, port);
         TTPConnection conn = ttpService.connect("127.0.0.1", (short) port, "127.0.0.1", (short) 4096);
         System.out.println("Server: got connection "+conn.getTag());
-
 
         boolean isValid = false;
         while (!isValid) {
@@ -63,12 +65,15 @@ public class FTPClient {
         ttpService.close(conn);
     }
 
+    /**
+     * Validate the MD5Checksum of file at client side
+     * @param path path of local copy
+     * @param expected expected MD5 string
+     * @return isValid
+     */
     public static boolean isMD5Valid(String path, String expected) {
         try {
             String checksum = DataUtil.getMD5Checksum(path);
-//
-//            System.out.println("Received: " + checksum);
-//            System.out.println("Expected: " + expected);
 
             return checksum.equals(expected);
 
@@ -77,7 +82,15 @@ public class FTPClient {
         }
     }
 
-
+    /**
+     * Write the file chunk to local copy
+     *
+     * @param path local copy path
+     * @param content file chunk content
+     * @param off offset from file
+     * @param length chunk length
+     * @throws IOException
+     */
     public static void writeContent(String path, byte[] content, int off, int length) throws IOException {
 
         // need to use seek, so switch to RandomAccessFile

@@ -23,7 +23,6 @@ public class FTPServer {
     private static TTPService ttpService;
 
 
-
     public static void main(String[] args) throws SocketException{
         if(args.length != 3) {
             printUsage();
