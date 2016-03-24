@@ -154,7 +154,6 @@ public class TTPService {
      */
     public void close(TTPConnection conn) throws IOException, ClassNotFoundException{
         // send FIN
-
         TTPSegment fin = packSegment(conn, TTPSegment.Type.FIN, 0, null);
 
         boolean isSent = false;
@@ -164,14 +163,11 @@ public class TTPService {
 
         while (!conn.isReceivedFINACK());
         conn.setReceivedFINACK(false);
-        System.out.println("1111");
 
         conn.close();
         try {
-            System.out.println("2222");
             Thread.sleep(3000);
         } catch (InterruptedException e){}
-        System.out.println("333");
 
         connections.remove(conn.getTag());
         // stop receiver thread
@@ -200,19 +196,14 @@ public class TTPService {
                 conn.setLastAcked(finSeq);
 
                 // wait to receive ACK of FIN_ACK
-
                 try {
                     while (conn.hasUnacked() && conn.firstUnacked() <= finack.getSeqNum());
                 } catch (NoSuchElementException e) {}
 
                 System.out.println("Received ACK for FINACK");
 
-                try {
-                    Thread.sleep(3000);
-                } catch (Exception e){}
-
-                conn.close();
                 connections.remove(conn.getTag());
+                conn.close();
             }
         };
         thread.start();
@@ -318,7 +309,11 @@ public class TTPService {
         boolean isEnd = false;
         while (!isEnd) {
 
-            while (!conn.hasData());
+            // break through the loop if connection closed
+            while (conn.isActive && !conn.hasData());
+            if (!conn.isActive) {
+                throw new SocketException("Connection closed");
+            }
 
             Datagram datagram = conn.retrieveData();
             TTPSegment segment = (TTPSegment) datagram.getData();
@@ -397,7 +392,7 @@ public class TTPService {
 
         // no available connections yet, return
         if (conn == null) {
-            System.out.println("Connection not found!!!");
+            System.out.println("Connection not found or stopped");
             return false;
         }
 
