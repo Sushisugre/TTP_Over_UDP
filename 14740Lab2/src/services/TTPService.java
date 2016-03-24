@@ -35,6 +35,7 @@ public class TTPService {
         this.receiver = new ReceiverThread();
         this.ds = new DatagramService(port, 10);
 
+        // launch receiver thread
         this.receiver.start();
     }
 
@@ -59,7 +60,7 @@ public class TTPService {
      * @param dstPort destination port
      * @return connection
      */
-    public TTPConnection addPendingConnection(String srcAddr, short srcPort,
+    private TTPConnection addPendingConnection(String srcAddr, short srcPort,
                                      String dstAddr, short dstPort) {
         TTPConnection conn = new TTPConnection(winSize, timeout, this);
         conn.setSrcAddr(srcAddr);
@@ -160,8 +161,7 @@ public class TTPService {
            isSent = sendSegment(conn, fin);
         }
 
-
-        while (conn.isReceivedFINACK());
+        while (!conn.isReceivedFINACK());
         System.out.println("get fin ack");
         conn.setReceivedFINACK(false);
 
@@ -173,11 +173,12 @@ public class TTPService {
     }
 
     /**
-     *  Accept a close request
+     *  Accept a close connection request
+     *
      * @param conn connection
      * @throws IOException
      */
-    public void acceptClose(TTPConnection conn, int finSeq) throws IOException {
+    private void acceptClose(TTPConnection conn, int finSeq) throws IOException {
         System.out.println("Receive FIN");
 
         TTPSegment finack = packSegment(conn, TTPSegment.Type.FIN_ACK, finSeq, null);
@@ -263,7 +264,7 @@ public class TTPService {
     }
 
     /**
-     * Send a datagram
+     * Send a datagram through a connection
      *
      * @param conn connection
      * @param datagram datagram
@@ -402,7 +403,7 @@ public class TTPService {
             case ACK:
                 while (!conn.hasUnacked());
                 // cumulative ack, so the ack num may be larger than first unacked
-                System.out.println("  ACK ackNum:"+segment.getAckNum()+", firstUnacked:"+conn.firstUnacked());
+                System.out.println("  ACK ackNum: "+segment.getAckNum()+", firstUnacked:"+conn.firstUnacked());
 
                 if (segment.getAckNum() >= conn.firstUnacked()) {
                     handleACK(segment, conn);
@@ -465,6 +466,7 @@ public class TTPService {
 
     /**
      * Helper method to send ACK
+     *
      * @param conn connection
      * @param seqNum the sequence of the segment ACKed
      * @throws IOException
@@ -478,6 +480,7 @@ public class TTPService {
 
     /**
      * Helper method to validate UDP checksum
+     *
      * @param datagram UDP datagram
      * @return isValid
      */

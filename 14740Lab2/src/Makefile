@@ -1,3 +1,5 @@
+# this is ugly ... whatever
+
 make:   FTPClient.class \
         FTPServer.class \
         Datagram.class \

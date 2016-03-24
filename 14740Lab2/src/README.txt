@@ -1,3 +1,5 @@
+
+
 #### Folder Structure
 
 applications/
@@ -8,8 +10,8 @@ applications/
 datatypes/
     Classes that encapsulate data when transmitting, listed in a top-down order
     - Application level
-        - FTPMeta
-        - FTPData
+        - FTPMeta:      Meta data for the requested file, including size, MD5 etc.
+        - FTPData:      Contains a chunk of the requested file
     - TTP level
         - TTPSegment
     - UDP
@@ -18,9 +20,9 @@ datatypes/
 services/
     Implementation of the transportation protocol
     - DatagramServices
-    - DataUtil: util that handles serialization & deserialization, checksum computation, etc
-    - TTPConnection: simulate a socket between 2 host, handle Go-Back-N window, timer, etc
-    - TTPServices: core of TTP implementation, receive and send packet, etc
+    - DataUtil:         util that handles serialization & deserialization, checksum computation, etc
+    - TTPConnection:    simulate a socket between 2 host, handle Go-Back-N window, timer, etc
+    - TTPServices:      core of TTP implementation, receive and send packet, etc
 
 
 #### Execution

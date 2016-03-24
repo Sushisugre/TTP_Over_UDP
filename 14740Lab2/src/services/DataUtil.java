@@ -11,6 +11,7 @@ public class DataUtil {
 
     /**
      * Serialize data object to byte array
+     *
      * @param object data object
      * @return byte array
      */
@@ -26,6 +27,12 @@ public class DataUtil {
         }
     }
 
+    /**
+     * Deserialize object from byte array
+     *
+     * @param data byte array
+     * @return object
+     */
     public static Object byteToObject(byte[] data) {
 
         ByteArrayInputStream byteIn = new ByteArrayInputStream(data);
@@ -42,6 +49,7 @@ public class DataUtil {
 
     /***
      * Calculate checksum use the UDP approach
+     *
      * @return checksum
      */
     public static short getUDPCheckSum(byte[] data){
@@ -66,6 +74,12 @@ public class DataUtil {
 
     }
 
+    /**
+     * Calculate the MD5Checksum of a file
+     * @param path
+     * @return
+     * @throws FileNotFoundException
+     */
     public static String getMD5Checksum(String path) throws FileNotFoundException{
 
         byte[] buffer = new byte[1024];

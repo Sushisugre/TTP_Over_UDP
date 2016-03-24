@@ -14,12 +14,16 @@ import java.net.SocketException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-
+/**
+ * Simple FTPServer that handler file request
+ */
 public class FTPServer {
 
+    // Chunk large file into small pieces, shouldn't dump large file in memory
     private static final int CHUNK_SIZE = 1024 * 512;
-    private static ExecutorService threadPool =
-            Executors.newFixedThreadPool(30);
+    // Thread pool for handling client requests
+    private static ExecutorService threadPool = Executors.newFixedThreadPool(30);
+    // TTPServices associated with server
     private static TTPService ttpService;
 
 
@@ -37,12 +41,11 @@ public class FTPServer {
         ttpService = new TTPService(winSize, timeout, port);
 
         while (true) {
-            System.out.println(" waiting for accept");
             try{
 
                 // receive a connection
                 TTPConnection conn = ttpService.accept("127.0.0.1", (short) 4096);
-                System.out.println("Server: got connection "+conn.getTag());
+                System.out.println("Server: got connection from " + conn.getTag());
 
                 // send the connection to handler thread
                 RequestHandler handler = new RequestHandler(conn);
@@ -77,7 +80,6 @@ public class FTPServer {
                     System.out.println("Server: receive request for - " + path);
 
                     File file = new File(path);
-                    System.out.println("what the hell");
                     boolean isFound = file.exists();
                     System.out.println("Server: " + path +" found? " + isFound);
 
@@ -101,6 +103,7 @@ public class FTPServer {
                     byte[] buffer = new byte[CHUNK_SIZE];
                     BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
 
+                    // loop to send the chunks of requested file
                     while (remain > 0 && retVal != -1) {
 
                         int length = remain > CHUNK_SIZE? CHUNK_SIZE:remain;
@@ -127,7 +130,7 @@ public class FTPServer {
             } catch (FileNotFoundException e){
                 e.printStackTrace();
             } catch (SocketException e) {
-                System.err.println("Client closed connection.");
+                System.err.println("Client: closed connection.");
             } catch (Exception e) {
                 e.printStackTrace();
             }

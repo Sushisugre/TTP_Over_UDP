@@ -13,7 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 /**
- * FTPClient that requests file from FTPServer
+ * Simple FTPClient that requests file from FTPServer
  */
 public class FTPClient {
 
@@ -48,7 +48,6 @@ public class FTPClient {
             System.out.println("Client: total file size " + size);
             int offset = 0;
             while(offset < size) {
-                System.out.println("Client: getting file chunk");
                 FTPData data = (FTPData) DataUtil.byteToObject(ttpService.receive(conn));
                 writeContent(path+"_copy", data.getData(), offset, data.getSize());
                 offset += data.getSize();

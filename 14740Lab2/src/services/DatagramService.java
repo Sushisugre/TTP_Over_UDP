@@ -48,13 +48,18 @@ public class DatagramService {
 		TTPSegment segment = (TTPSegment) datagram.getData();
 		int seqNum = segment.getSeqNum();
 
-		// Send packet
-		int rand = randInt(0,500);
-		if (rand != 22) {
-			socket.send(packet);
-		} else {
-			System.out.println("===> Drop this packet " + seqNum);
-		}
+		System.out.println("Last step of send!!!");
+
+		socket.send(packet);
+
+
+//		// Send packet
+//		int rand = randInt(0,500);
+//		if (rand != 22) {
+//			socket.send(packet);
+//		} else {
+//			System.out.println("===> Drop this packet " + seqNum);
+//		}
 	}
 
 	public Datagram receiveDatagram() throws IOException,
