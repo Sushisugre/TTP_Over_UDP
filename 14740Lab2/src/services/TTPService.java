@@ -145,6 +145,7 @@ public class TTPService {
 
     /**
      * Close a connection
+     *
      * @param conn connection
      * @throws IOException
      * @throws ClassNotFoundException
@@ -160,8 +161,39 @@ public class TTPService {
         }
 
 
-        while (conn.isReceivedSYN());
+        while (conn.isReceivedFINACK());
+        System.out.println("get fin ack");
+        conn.setReceivedFINACK(false);
 
+        conn.close();
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e){}
+        connections.remove(conn.getTag());
+    }
+
+    /**
+     *  Accept a close request
+     * @param conn connection
+     * @throws IOException
+     */
+    public void acceptClose(TTPConnection conn, int finSeq) throws IOException {
+        System.out.println("Receive FIN");
+
+        TTPSegment finack = packSegment(conn, TTPSegment.Type.FIN_ACK, finSeq, null);
+        sendSegment(conn, finack);
+        conn.setLastAcked(finSeq);
+        System.out.println("Send finack");
+
+        // wait to receive ACK of FIN_ACK
+        while (conn.hasUnacked() && conn.firstUnacked() <= finack.getSeqNum());
+        System.out.println("Received ACK for FINACK");
+
+        try {
+            Thread.sleep(3000);
+        } catch (Exception e){}
+
+        conn.close();
         connections.remove(conn.getTag());
     }
 
@@ -329,7 +361,6 @@ public class TTPService {
         TTPSegment segment = (TTPSegment) datagram.getData();
 
         String key = datagram.getSrcaddr()+":"+datagram.getSrcport();
-        System.out.println("Connection key: " + key);
         TTPConnection conn = connections.get(key);
 
         // if no matching connection in the connection table, and this segment is a SYN
@@ -364,6 +395,7 @@ public class TTPService {
             return;
         }
 
+
         switch (segment.getType()) {
             case ACK:
                 while (!conn.hasUnacked());
@@ -377,6 +409,7 @@ public class TTPService {
                 break;
             case FIN:
                 conn.setReceivedFIN(true);
+                acceptClose(conn, segment.getSeqNum());
                 break;
             case SYN_ACK:
                 conn.setReceivedSYNACK(true);
@@ -386,6 +419,9 @@ public class TTPService {
                 break;
             case FIN_ACK:
                 conn.setReceivedFINACK(true);
+                while (!conn.hasUnacked());
+                System.out.println("  FIN ACK ackNum:"+segment.getAckNum()+", firstUnacked:"+conn.firstUnacked());
+                handleACK(segment, conn);
                 sendAck(conn, segment.getSeqNum());
                 break;
             case DATA:

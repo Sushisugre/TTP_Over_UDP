@@ -51,6 +51,9 @@ public class TTPConnection {
     private boolean receivedSYNACK;
     private boolean receivedFINACK;
 
+    // if the connection is closed, change to false
+    public boolean isActive;
+
     public TTPConnection(int winSize, int timeout, TTPService ttpService) {
         this.winSize = winSize;
         this.timeout = timeout;
@@ -61,6 +64,7 @@ public class TTPConnection {
         controlQueue = new ConcurrentLinkedQueue<>();
         nextSeq = ISN;
         lastAcked = ISN - 1;
+        isActive = true;
     }
 
     /**
@@ -71,6 +75,12 @@ public class TTPConnection {
         return dstAddr + ":" +dstPort;
     }
 
+    /**
+     * Change the connection to be inactive
+     */
+    public void close(){
+        isActive =false;
+    }
 
     /**
      * Start or restart timer for oldest datagram in the window,
@@ -197,6 +207,7 @@ public class TTPConnection {
         } else if (type == TTPSegment.Type.DATA || type == TTPSegment.Type.EOF) {
             return dataQueue.poll();
         } else {
+            while (controlQueue.isEmpty() || ((TTPSegment)controlQueue.peek().getData()).getType() != type);
             return controlQueue.poll();
         }
     }

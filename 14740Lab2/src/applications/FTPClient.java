@@ -35,7 +35,7 @@ public class FTPClient {
 
         boolean isValid = false;
         while (!isValid) {
-
+            System.out.println("start or start again");
             ttpService.send(conn, DataUtil.objectToByte(path));
             System.out.println("Client: requesting file: " + path);
             FTPMeta meta = (FTPMeta) DataUtil.byteToObject(ttpService.receive(conn));
