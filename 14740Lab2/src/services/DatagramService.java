@@ -48,8 +48,6 @@ public class DatagramService {
 		TTPSegment segment = (TTPSegment) datagram.getData();
 		int seqNum = segment.getSeqNum();
 
-		System.out.println("Last step of send!!!");
-
 		socket.send(packet);
 
 

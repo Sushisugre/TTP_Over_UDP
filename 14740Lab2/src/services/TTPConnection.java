@@ -141,6 +141,7 @@ public class TTPConnection {
         return !unacked.isEmpty();
     }
 
+
     /**
      * After received a valid ACK, slide the window
      * @param startSeq oldest unacknowledged packet
@@ -167,9 +168,9 @@ public class TTPConnection {
      * @return seqNum
      */
     public int firstUnacked() {
-        synchronized (unacked) {
+//        synchronized (unacked) {
             return unacked.firstKey();
-        }
+//        }
     }
 
     /**
@@ -266,14 +267,6 @@ public class TTPConnection {
 
     public void setDstPort(short dstPort) {
         this.dstPort = dstPort;
-    }
-
-    synchronized boolean isReceivedFIN() {
-        return receivedFIN;
-    }
-
-    synchronized void setReceivedFIN(boolean receivedFIN) {
-        this.receivedFIN = receivedFIN;
     }
 
     synchronized boolean isReceivedFINACK() {

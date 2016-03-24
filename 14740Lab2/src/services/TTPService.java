@@ -8,6 +8,7 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 /**
  * Implementation of trusted trasportation protocol over UDP
@@ -162,40 +163,59 @@ public class TTPService {
         }
 
         while (!conn.isReceivedFINACK());
-        System.out.println("get fin ack");
         conn.setReceivedFINACK(false);
+        System.out.println("1111");
 
         conn.close();
         try {
+            System.out.println("2222");
             Thread.sleep(3000);
         } catch (InterruptedException e){}
+        System.out.println("333");
+
         connections.remove(conn.getTag());
+        // stop receiver thread
+        this.receiver.interrupt();
     }
 
     /**
      *  Accept a close connection request
      *
-     * @param conn connection
+     * @param tag connection key
      * @throws IOException
      */
-    private void acceptClose(TTPConnection conn, int finSeq) throws IOException {
-        System.out.println("Receive FIN");
+    private void acceptClose(String tag, int finSeq) throws IOException {
 
-        TTPSegment finack = packSegment(conn, TTPSegment.Type.FIN_ACK, finSeq, null);
-        sendSegment(conn, finack);
-        conn.setLastAcked(finSeq);
-        System.out.println("Send finack");
+        Thread thread = new Thread(){
+            @Override
+            public void run() {
+//                acceptClose(connKey, segment.getSeqNum());
+                System.out.println("Receive FIN");
+                TTPConnection conn = connections.get(tag);
 
-        // wait to receive ACK of FIN_ACK
-        while (conn.hasUnacked() && conn.firstUnacked() <= finack.getSeqNum());
-        System.out.println("Received ACK for FINACK");
+                TTPSegment finack = packSegment(conn, TTPSegment.Type.FIN_ACK, finSeq, null);
+                try {
+                    sendSegment(conn, finack);
+                } catch (IOException e){}
+                conn.setLastAcked(finSeq);
 
-        try {
-            Thread.sleep(3000);
-        } catch (Exception e){}
+                // wait to receive ACK of FIN_ACK
 
-        conn.close();
-        connections.remove(conn.getTag());
+                try {
+                    while (conn.hasUnacked() && conn.firstUnacked() <= finack.getSeqNum());
+                } catch (NoSuchElementException e) {}
+
+                System.out.println("Received ACK for FINACK");
+
+                try {
+                    Thread.sleep(3000);
+                } catch (Exception e){}
+
+                conn.close();
+                connections.remove(conn.getTag());
+            }
+        };
+        thread.start();
     }
 
     /**
@@ -356,13 +376,15 @@ public class TTPService {
      * @throws ClassNotFoundException
      * @throws IOException
      */
-    private void receiveSegment() throws ClassNotFoundException, IOException{
+    private boolean receiveSegment() throws ClassNotFoundException, IOException{
+
+        boolean stoping = false;
 
         Datagram datagram = ds.receiveDatagram();
         TTPSegment segment = (TTPSegment) datagram.getData();
 
-        String key = datagram.getSrcaddr()+":"+datagram.getSrcport();
-        TTPConnection conn = connections.get(key);
+        String connKey = datagram.getSrcaddr()+":"+datagram.getSrcport();
+        TTPConnection conn = connections.get(connKey);
 
         // if no matching connection in the connection table, and this segment is a SYN
         // create a new connection and put it in the pending table
@@ -375,7 +397,8 @@ public class TTPService {
 
         // no available connections yet, return
         if (conn == null) {
-            return;
+            System.out.println("Connection not found!!!");
+            return false;
         }
 
         System.out.println("Receive Segment: " + segment.getSeqNum()
@@ -386,7 +409,7 @@ public class TTPService {
         if (!validateChecksum(datagram)) {
             System.err.println("Checksum error");
             sendAck(conn, conn.lastAcked());
-            return;
+            return false;
         }
 
         // out of order, ack is an exception because we allow cumulative ACK
@@ -395,7 +418,7 @@ public class TTPService {
                 || segment.getSeqNum() == conn.lastAcked() + 1)) {
             System.out.println("===> Out of order: expected - "+(conn.lastAcked()+1)+", got - " + segment.getSeqNum());
 //            sendAck(conn, conn.lastAcked());
-            return;
+            return false;
         }
 
 
@@ -404,19 +427,17 @@ public class TTPService {
                 while (!conn.hasUnacked());
                 // cumulative ack, so the ack num may be larger than first unacked
                 System.out.println("  ACK ackNum: "+segment.getAckNum()+", firstUnacked:"+conn.firstUnacked());
-
+                conn.setLastAcked(segment.getSeqNum());
                 if (segment.getAckNum() >= conn.firstUnacked()) {
                     handleACK(segment, conn);
                 }
-                conn.setLastAcked(segment.getSeqNum());
 
                 break;
             case SYN:
                 conn.setReceivedSYN(true);
                 break;
             case FIN:
-                conn.setReceivedFIN(true);
-                acceptClose(conn, segment.getSeqNum());
+                acceptClose(connKey, segment.getSeqNum());
                 break;
             case SYN_ACK:
                 conn.setReceivedSYNACK(true);
@@ -429,7 +450,11 @@ public class TTPService {
                 while (!conn.hasUnacked());
                 System.out.println("  FIN ACK ackNum:"+segment.getAckNum()+", firstUnacked:"+conn.firstUnacked());
                 handleACK(segment, conn);
-                sendAck(conn, segment.getSeqNum());
+                // send multiple ACK to be safe
+                for (int i=0; i<5; i++) {
+                    sendAck(conn, segment.getSeqNum());
+                }
+                stoping = true;
                 break;
             case DATA:
                 sendAck(conn, segment.getSeqNum());
@@ -442,6 +467,7 @@ public class TTPService {
         }
 
         conn.addToQueue(datagram);
+        return stoping;
     }
 
     /**
@@ -498,12 +524,15 @@ public class TTPService {
      */
     class ReceiverThread extends Thread {
 
+        boolean stop = false;
+
         @Override
         public void run() {
             System.out.println("Receiver thread started");
-            while (!currentThread().isInterrupted()) {
+            while (!(currentThread().isInterrupted()|| stop)) {
                 try {
-                    TTPService.this.receiveSegment();
+
+                    stop = TTPService.this.receiveSegment();
 
                 } catch (IOException e){
                     e.printStackTrace();
@@ -512,6 +541,7 @@ public class TTPService {
                 }
 
             }
+            System.out.println("TTPService stops, receiver stops");
         }
 
     }
