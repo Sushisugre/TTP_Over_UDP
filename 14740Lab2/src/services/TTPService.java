@@ -176,7 +176,7 @@ public class TTPService {
      * @param tag connection key
      * @throws IOException
      */
-    private void acceptClose(String tag, int finSeq) throws IOException {
+    private void acceptClose(final String tag, final int finSeq) throws IOException {
 
         Thread thread = new Thread(){
             @Override
