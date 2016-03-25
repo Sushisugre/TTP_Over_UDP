@@ -15,6 +15,8 @@ public class TTPSegment implements Serializable {
      */
     public static final int MAX_SEGMENT_SIZE = 1300;
 
+    public static final int MAX_DATA_SIZE = MAX_SEGMENT_SIZE - HEADER_SIZE;
+
     public enum Type {
         SYN,
         ACK,

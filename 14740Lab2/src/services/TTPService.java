@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 /**
- * Implementation of trusted trasportation protocol over UDP
+ * Implementation of trusted transportation protocol over UDP
  */
 public class TTPService {
     // retransmission timer interval
@@ -82,7 +82,7 @@ public class TTPService {
      */
     public TTPConnection accept(String srcAddr, short srcPort) throws IOException, ClassNotFoundException{
 
-        String key = srcAddr+":"+srcPort;
+        String key = srcAddr + ":" + srcPort;
         while(!pendingConnection.containsKey(key));
 
         TTPConnection conn = pendingConnection.get(key);
@@ -107,14 +107,13 @@ public class TTPService {
     }
 
     /**
-     * Establish connection with a server
+     * Send connect request to a server
      *
      * @param srcAddr source address
      * @param srcPort source port
      * @param dstAddr destination address
      * @param dstPort destination port
      * @return connection
-     *
      * @throws IOException
      * @throws ClassNotFoundException
      */
@@ -165,10 +164,6 @@ public class TTPService {
         conn.setReceivedFINACK(false);
 
         conn.close();
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e){}
-
         connections.remove(conn.getTag());
         // stop receiver thread
         this.receiver.interrupt();
@@ -176,6 +171,7 @@ public class TTPService {
 
     /**
      *  Accept a close connection request
+     *  TODO: this is ugly
      *
      * @param tag connection key
      * @throws IOException
@@ -185,22 +181,20 @@ public class TTPService {
         Thread thread = new Thread(){
             @Override
             public void run() {
-//                acceptClose(connKey, segment.getSeqNum());
-                System.out.println("Receive FIN");
+
                 TTPConnection conn = connections.get(tag);
 
                 TTPSegment finack = packSegment(conn, TTPSegment.Type.FIN_ACK, finSeq, null);
                 try {
                     sendSegment(conn, finack);
                 } catch (IOException e){}
+
                 conn.setLastAcked(finSeq);
 
                 // wait to receive ACK of FIN_ACK
                 try {
                     while (conn.hasUnacked() && conn.firstUnacked() <= finack.getSeqNum());
                 } catch (NoSuchElementException e) {}
-
-                System.out.println("Received ACK for FINACK");
 
                 connections.remove(conn.getTag());
                 conn.close();
@@ -225,18 +219,18 @@ public class TTPService {
         while (remain > 0) {
             int len;
             TTPSegment.Type type;
-            if (remain + TTPSegment.HEADER_SIZE > TTPSegment.MAX_SEGMENT_SIZE) {
-                len = TTPSegment.MAX_SEGMENT_SIZE - TTPSegment.HEADER_SIZE;
+            if (remain > TTPSegment.MAX_DATA_SIZE) {
+                len = TTPSegment.MAX_DATA_SIZE;
                 type = TTPSegment.Type.DATA;
             } else {
                 len = remain;
                 type = TTPSegment.Type.EOF;
             }
 
-            byte[] fagment = new byte[len];
-            System.arraycopy(data, length - remain, fagment, 0, len);
+            byte[] fragment = new byte[len];
+            System.arraycopy(data, length - remain, fragment, 0, len);
 
-            TTPSegment segment = packSegment(conn, type, 0, fagment);
+            TTPSegment segment = packSegment(conn, type, 0, fragment);
 
             // loop until there's space available in send window
             boolean isSent = false;
@@ -283,16 +277,16 @@ public class TTPService {
      */
     void sentDatagram(TTPConnection conn, Datagram datagram) throws IOException{
 
-            ds.sendDatagram(datagram);
+        ds.sendDatagram(datagram);
 
-            TTPSegment segment = (TTPSegment) datagram.getData();
-            System.out.println("Send Segment: " + segment.getSeqNum() +" " + segment.getType().toString());
+        TTPSegment segment = (TTPSegment) datagram.getData();
+        System.out.println("Send Segment: " + segment.getSeqNum() +" " + segment.getType().toString());
 
-            if (segment.getType() != TTPSegment.Type.ACK) {
-                if (!conn.hasUnacked())
-                    conn.startTimer();
-                conn.addToWindow(segment.getSeqNum(), datagram);
-            }
+        if (segment.getType() != TTPSegment.Type.ACK) {
+            if (!conn.hasUnacked())
+                conn.startTimer();
+            conn.addToWindow(segment.getSeqNum(), datagram);
+        }
     }
 
     /**
@@ -306,6 +300,7 @@ public class TTPService {
     public byte[] receive(TTPConnection conn) throws ClassNotFoundException, IOException{
         List<byte[]> fragments = new ArrayList<>();
         int length = 0;
+
         boolean isEnd = false;
         while (!isEnd) {
 
@@ -329,16 +324,26 @@ public class TTPService {
             fragments.add(segment.getData());
         }
 
-        // reassemble fragments
+        return reassemble(length, fragments);
+    }
+
+    /**
+     * Reassmeble fragments
+     *
+     * @param length totalLength
+     * @param fragments fragment list
+     * @return data byte array
+     */
+    private byte[] reassemble(int length, List<byte[]> fragments) {
         byte[] data = new byte[length];
         int pos = 0;
         for (byte[] frag: fragments){
             System.arraycopy(frag, 0, data, pos, frag.length);
             pos += frag.length;
         }
-
         return data;
     }
+
 
     /**
      * Helper method to construct a specified type of segment
@@ -367,6 +372,7 @@ public class TTPService {
     /**
      * Keep running in the ReceiverThread since TTPService is initiated
      * Receive a single TTPSegment, dispatch to different connections that associated with the TTPService instance
+     * This is ugly
      *
      * @throws ClassNotFoundException
      * @throws IOException
@@ -378,7 +384,7 @@ public class TTPService {
         Datagram datagram = ds.receiveDatagram();
         TTPSegment segment = (TTPSegment) datagram.getData();
 
-        String connKey = datagram.getSrcaddr()+":"+datagram.getSrcport();
+        String connKey = datagram.getSrcaddr() + ":" + datagram.getSrcport();
         TTPConnection conn = connections.get(connKey);
 
         // if no matching connection in the connection table, and this segment is a SYN
@@ -411,7 +417,6 @@ public class TTPService {
         if (!(segment.getType() == TTPSegment.Type.ACK
                 || segment.getSeqNum() == conn.lastAcked() + 1)) {
             System.out.println("===> Out of order: expected - "+(conn.lastAcked()+1)+", got - " + segment.getSeqNum());
-//            sendAck(conn, conn.lastAcked());
             return false;
         }
 
@@ -444,10 +449,13 @@ public class TTPService {
                 while (!conn.hasUnacked());
                 System.out.println("  FIN ACK ackNum:"+segment.getAckNum()+", firstUnacked:"+conn.firstUnacked());
                 handleACK(segment, conn);
+
                 // send multiple ACK to be safe
                 for (int i=0; i<5; i++) {
                     sendAck(conn, segment.getSeqNum());
                 }
+
+                // prepare to close socket
                 stoping = true;
                 break;
             case DATA:

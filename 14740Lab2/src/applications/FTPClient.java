@@ -90,7 +90,7 @@ public class FTPClient {
      * @param length chunk length
      * @throws IOException
      */
-    public static void writeContent(String path, byte[] content, int off, int length) throws IOException {
+    private static void writeContent(String path, byte[] content, int off, int length) throws IOException {
 
         // need to use seek, so switch to RandomAccessFile
         RandomAccessFile fileStream = new RandomAccessFile(path,"rwd");
